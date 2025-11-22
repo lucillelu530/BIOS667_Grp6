@@ -1,0 +1,254 @@
+---
+title: "GLM_Models"
+author: "Rui Peng"
+date: "2025-11-19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+library(readr)
+library(pROC)
+library(tidyverse)
+library(geepack)   # for GEE
+library(lme4)      # for GLMM (lmer, glmer)
+library(broom)     # for tidy() tables
+
+
+########################################
+## 1. Read & Clean Data
+########################################
+
+# Replace with your actual file name / path
+oasis_raw <- read.csv("C:\\Users\\19193\\Downloads\\oasis_longitudinal.csv") 
+oasis <- oasis_raw %>%
+  rename(
+    subject_id   = Subject.ID,   # already cleaned
+    mri_id       = MRI.ID,
+    group        = Group,
+    visit        = Visit,
+    mr_delay     = MR.Delay,
+    sex          = M.F,          # rename M.F → sex
+    hand         = Hand,
+    age          = Age,
+    educ         = EDUC,
+    ses          = SES,
+    mmse         = MMSE,
+    cdr          = CDR,
+    etiv         = eTIV,
+    nwbv         = nWBV,
+    asf          = ASF
+  )
+
+# Assume we now have:
+# subject_id, visit, mr_delay, age, m_f, educ, ses, mmse, cdr, group
+# If names differ, change them in the code below.
+
+########################################
+## 2. Create Time & Derived Variables
+########################################
+
+oasis <- oasis%>%
+  mutate(
+    # Time in years since baseline MRI
+    time_years = mr_delay / 365,
+    # Centered time
+    time_c = time_years - mean(time_years, na.rm = TRUE),
+    
+    # Binary poor cognition indicator (MMSE < 24 is common cutoff)
+    poor_cognition = if_else(mmse < 24, 1L, 0L),
+    
+    # Make factors nicely labeled
+    sex = factor(sex, levels = c("F", "M")),
+    group = factor(group),         # e.g., "Nondemented", "Demented"
+    subject_id = factor(subject_id)
+  )
+
+########################################
+## 3. Build Dataset for GLM (Baseline + Final Only)
+########################################
+
+# 3.1 Baseline (Visit == 1)
+baseline <- oasis %>%
+  filter(visit == 1) %>%
+  select(
+    subject_id,
+    age_baseline = age,
+    educ_baseline = educ,
+    sex_baseline  = sex,
+    cdr_baseline  = cdr,
+    group_baseline = group,
+    mmse_baseline = mmse
+  )
+
+# 3.2 Final visit per subject (max visit)
+final <- oasis %>%
+  group_by(subject_id) %>%
+  filter(visit == max(visit)) %>%
+  ungroup() %>%
+  select(
+    subject_id,
+    visit_final = visit,
+    time_years_final = time_years,
+    mmse_final = mmse,
+    poor_cognition_final = poor_cognition
+  )
+
+# 3.3 Merge baseline + final
+glm_dat <- baseline %>%
+  inner_join(final, by = "subject_id") %>%
+  mutate(
+    delta_mmse = mmse_final - mmse_baseline
+  )
+
+# Keep only subjects with at least 2 visits (otherwise baseline == final)
+glm_dat <- glm_dat %>%
+  filter(visit_final > 1)
+
+########################################
+## 4. GLM Models
+########################################
+
+########################################
+## 4.1 RQ1 — Logistic GLM (poor cognition)
+########################################
+
+glm_rq1 <- glm(
+  poor_cognition_final ~ age_baseline + educ_baseline + sex_baseline +
+    cdr_baseline + group_baseline,
+  data = glm_dat,
+  family = binomial()
+)
+
+summary(glm_rq1)
+
+### Odds ratios (constant across covariates)
+or_table <- exp(cbind(OR = coef(glm_rq1), confint(glm_rq1)))
+or_table
+
+### Predicted probabilities
+# Extract the dataset actually used in fitting the model
+glm_dat_used <- model.frame(glm_rq1)
+
+# Add predicted probabilities
+glm_dat_used$pred_prob <- predict(glm_rq1, type = "response")
+
+# Classification
+glm_dat_used$pred_class <- if_else(glm_dat_used$pred_prob > 0.5, 1, 0)
+
+# Confusion matrix
+table(Predicted = glm_dat_used$pred_class,
+      Observed = glm_dat_used$poor_cognition_final)
+
+
+########################################
+## Discrimination: ROC & AUC
+########################################
+
+roc_obj <- roc(glm_dat_used$poor_cognition_final, glm_dat_used$pred_prob)
+auc(roc_obj)
+
+plot(roc_obj, col = "blue", main = "ROC Curve for Logistic GLM")
+
+########################################
+## Calibration: predicted vs observed
+########################################
+
+glm_dat <- glm_dat %>%
+  mutate(prob_bin = cut(pred_prob, breaks = seq(0,1,0.1), include.lowest = TRUE))
+
+calibration <- glm_dat %>%
+  group_by(prob_bin) %>%
+  summarise(
+    mean_pred = mean(pred_prob),
+    mean_obs  = mean(poor_cognition_final)
+  )
+
+print(calibration)
+
+ggplot(calibration, aes(x = mean_pred, y = mean_obs)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, color = "red") +
+  labs(title = "Calibration Plot", x = "Predicted Probability", y = "Observed Proportion")
+
+########################################
+## Residuals, leverage, influence
+########################################
+
+# Deviance residuals
+plot(residuals(glm_rq1, type = "deviance"), 
+     main = "Deviance Residuals")
+
+# Leverage and influence
+plot(glm_rq1, which = 4)   # Cook's distance
+plot(glm_rq1, which = 5)   # Residuals vs leverage
+
+########################################
+## Linearity check on logit scale
+########################################
+
+# Box-Tidwell requires positive predictors. If needed, add a small constant.
+library(car)
+boxTidwell(poor_cognition_final ~ age_baseline + educ_baseline, data = glm_dat)
+
+########################################
+## Hosmer-Lemeshow Goodness-of-Fit
+########################################
+
+library(ResourceSelection)
+hoslem.test(glm_dat$poor_cognition_final, fitted(glm_rq1))
+
+########################################
+## Multicollinearity
+########################################
+
+vif(glm_rq1)
+
+########################################
+## Optional: try nonlinear terms (re-specification)
+########################################
+
+glm_rq1_quad <- glm(
+  poor_cognition_final ~ poly(age_baseline, 2) + educ_baseline + sex_baseline +
+    cdr_baseline + group_baseline,
+  data = glm_dat,
+  family = binomial()
+)
+
+AIC(glm_rq1, glm_rq1_quad)
+
+
+### 4.2 RQ2: Change in MMSE (linear GLM)
+
+glm_rq2 <- lm(
+  delta_mmse ~ age_baseline + educ_baseline + sex_baseline +
+    cdr_baseline + group_baseline,
+  data = glm_dat
+)
+
+summary(glm_rq2)
+
+# Diagnostics (for RQ2 linear model)
+par(mfrow = c(2, 2))
+plot(glm_rq2)   # residuals, Q-Q, etc.
+par(mfrow = c(1, 1))
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
