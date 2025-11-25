@@ -1,0 +1,573 @@
+---
+title: "BIOS667_FinalReport"
+author: Yini Lu, Wan-Chen Lin, Rui Peng, Yixin Zhang
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    number-sections: true
+    embed-resources: true
+    code-fold: true
+    code-tools: false
+execute:
+  echo: false
+  warning: false
+  message: false
+editor: visual
+bibliography: refs.bib
+csl: ieee.csl
+---
+
+## Introduction
+
+Alzheimer’s disease (AD) is the most common cause of dementia worldwide and remains one of the most pressing public health challenges of the 21st century. Global estimates consistently show that the number of individuals with dementia will continue to rise substantially as populations age, placing growing demands on health systems, caregivers, and societies. International reports by Alzheimer’s Disease International and the World Health Organization highlight the accelerating global burden of dementia and emphasize the critical importance of early identification and intervention [@adi2020] [@who2025]. Additional epidemiological analyses demonstrate that dementia prevalence is projected to increase sharply across diverse regions, with recent summaries emphasizing both the clinical and economic implications of this trend [@alzassociation2024; @prince2025].
+
+Accurate and early cognitive assessment plays a central role in diagnosing Alzheimer’s disease, evaluating disease progression, and identifying individuals at elevated risk of decline. The Mini-Mental State Examination (MMSE) is one of the most widely used tools for assessing global cognitive status in clinical practice and research. Originally developed by Folstein and colleagues as a brief, standardized screening test for cognitive impairment [@folstein1975], the MMSE has been extensively evaluated in subsequent psychometric and methodological reviews [@tombaugh1992]. A comprehensive Cochrane review confirms that the MMSE maintains practical diagnostic accuracy in community and primary care settings for the detection of dementia, particularly among older adults without prior cognitive evaluation [@creavin2016]. The MMSE’s strengths—short administration time, standardized scoring, and widespread clinical familiarity—have contributed to its enduring role in AD assessment frameworks.
+
+A key aspect of employing the MMSE in both clinical and epidemiologic research is defining a meaningful cutoff to indicate cognitive impairment. A widely used and historically supported threshold is a total score below 24, which corresponds to at least mild impairment and is associated with substantial reductions in functional independence. Validation studies demonstrate that an MMSE score \< 24 yields high specificity for probable and possible Alzheimer’s disease, even across diverse demographic groups. In highly educated samples, the standard cutoff of 24 retains excellent specificity and acceptable sensitivity for detecting dementia, supporting its continued use in research settings [@obryant2008]. More recent calibration studies have proposed refined thresholds to distinguish mild and severe impairment and to optimize diagnostic classification; however, MMSE \< 24 remains a widely interpreted and clinically intuitive definition of poor cognition [@salis2023]. At the same time, population-based norms indicate that MMSE performance varies systematically by age and education, highlighting the importance of adjusting for covariates when estimating cognitive status or decline [@crum1993].
+
+Understanding cognitive decline requires more than cross-sectional evaluation; longitudinal assessment of MMSE scores provides essential insights into the progression of Alzheimer’s disease. A substantial body of work has characterized cognitive trajectories in both preclinical and clinically diagnosed AD. Studies show that individuals who later develop Alzheimer’s disease exhibit distinct patterns of early decline, sometimes beginning years before clinical diagnosis [@small2007]. Among patients with established AD, trajectory analyses reveal heterogeneous rates of decline, with some individuals experiencing rapid deterioration and others showing more gradual changes [@wilkosz2010]. Contemporary large-scale longitudinal investigations further demonstrate that individuals with dementia experience steeper declines across multiple cognitive domains and that cognitive heterogeneity is substantial even within diagnostic groups [@payton2023]. Beyond AD-specific cohorts, research on aging populations highlights individual-level differences in cognitive trajectories and identifies demographic and clinical predictors—including age, education, and sex—that shape both baseline cognitive performance and rates of decline [@wilson2002].
+
+A growing body of evidence links demographic characteristics to differences in cognitive functioning and trajectories. Education is strongly associated with baseline cognitive performance, often interpreted through the lens of cognitive reserve theory; however, studies indicate that education primarily influences initial cognitive level rather than the speed of decline [@zahodne2011]. Sex-specific patterns have also been observed, with educational gradients in cognitive impairment risk varying by gender and age [@kim2022]. More recent life-course research demonstrates that both early-life and adult socioeconomic factors—including parental education—contribute to cognitive functioning in later life [@luo2025]. Together, these findings underscore the necessity of modeling the influence of age, sex, education, and clinical status when examining cognitive outcomes.
+
+Given this context, the present study aims to investigate how baseline age, education, sex, and dementia group are associated with the probability of poor cognition, defined as **MMSE \< 24** , and to characterize how this probability changes longitudinally. By modeling cognitive impairment as a dynamic process and examining how key demographic and clinical factors shape its trajectory, this research seeks to clarify the determinants of cognitive decline and inform strategies for early risk identification and dementia-focused interventions.
+
+To address these research aims, the present study utilizes data from the **Open Access Series of Imaging Studies (`OASIS`)**, a publicly available neuroimaging resource designed to advance research on brain aging and Alzheimer’s disease. `OASIS` provides richly detailed cross-sectional and longitudinal magnetic resonance imaging (MRI) data collected through collaborations among the Washington University Alzheimer’s Disease Research Center, the Neuroinformatics Research Group at Washington University, the Biomedical Informatics Research Network, and the Howard Hughes Medical Institute. The longitudinal dataset includes 150 adults aged 60 to 96, each with two or more MRI sessions separated by at least one year, totaling 373 imaging sessions. Within this cohort, 72 participants were nondemented across all visits, 64 were demented at baseline and remained so (including 51 with mild to moderate AD), and 14 transitioned from nondemented to demented during follow-up. Together, the longitudinal form of `OASIS` dataset provide a unique opportunity to examine cognitive trajectories across a wide age range and dementia statuses, enabling our cohort study to investigate **how baseline demographic and clinical factors, specifically age, sex, education, and dementia group, relate to both the probability and progression of poor cognition as measured by longitudinal changes in MMSE performance**.
+
+## Methods
+
+### Dataset description
+
+We analyzed data from the OASIS-2 longitudinal MRI aging cohort, which includes between one and four clinical visits per participant. At each visit, demographic characteristics, clinical dementia ratings (CDR), cognitive assessments (MMSE), and MRI-derived brain measures were recorded. The analytic dataset used in this project was restricted to individuals with valid MMSE measurements at baseline and at least one follow-up visit for longitudinal analysis.
+
+We defined `poor cognition`as `MMSE < 24` at the final observed visit, a commonly used threshold for cognitive impairment.
+
+$$
+Y_i=\mathbb{I}(MMSE_{i,\text{final}}<24)
+$$ The binary outcome (poor vs. non-poor cognition, based on MMSE) was modeled using three complementary approaches:
+
+-   **Logistic generalized linear model (GLM)**
+    -   Cross-sectional analysis using baseline predictors to estimate the odds of poor cognition at the final assessment.
+-   **Logistic generalized estimating equations (GEE)**
+    -   Population-averaged model for repeated MMSE-based outcomes, accounting for within-subject correlation across visits.
+-   **Logistic generalized linear mixed model (GLMM)**
+    -   Subject-specific model with random effects, providing individual-level trajectories of the probability of poor cognition over time.
+
+#### Data Preprocessing
+
+All analyses were conducted using a cleaned version of the OASIS-2 dataset. Participants missing baseline MMSE values were excluded to ensure consistent cognitive assessment across models. For the GLM analyses, we further restricted the sample to individuals with at least two clinical visits so that baseline-to-final change could be defined. Poor cognition was operationalized as `MMSE < 24` at the last available visit for each subject. Continuous predictors (age, education, and CDR) were inspected for missingness and extreme values, and factor variables (sex and diagnostic group) were cleaned and converted into categorical formats. The design matrix was evaluated for multicollinearity using variance inflation factors (VIF), and no meaningful collinearity was detected. No imputation was performed, and all models were fit using complete-case data. Importantly, the same preprocessed dataset was used to construct outcomes for GLM, GEE, and GLMM, allowing for consistent comparison across cross-sectional, marginal, and subject-specific modeling frameworks.
+
+```{r}
+##load all the packages we need
+library(readr)
+library(pROC)
+library(tidyverse)
+library(geepack)   # for GEE
+library(lme4)      # for GLMM (lmer, glmer)
+library(broom)     # for tidy() tables
+library(kableExtra)
+library(knitr)
+library(ggplot2)
+library(ggrepel)
+library(car)
+library(ResourceSelection)
+```
+
+```{r}
+## Data access
+
+
+oasis_raw <- read_csv("https://raw.githubusercontent.com/lucillelu530/BIOS667_Grp6/main/data/oasis_longitudinal.csv")
+oasis <- oasis_raw %>%
+  rename(
+    subject_id   = `Subject ID`,   # already cleaned
+    mri_id       = `MRI ID`,
+    group        = Group,
+    visit        = Visit,
+    mr_delay     = `MR Delay`,
+    sex          = `M/F`,          # rename M.F → sex
+    hand         = Hand,
+    age          = Age,
+    educ         = EDUC,
+    ses          = SES,
+    mmse         = MMSE,
+    cdr          = CDR,
+    etiv         = eTIV,
+    nwbv         = nWBV,
+    asf          = ASF
+  )
+# Assume we now have:
+# subject_id, visit, mr_delay, age, m_f, educ, ses, mmse, cdr, group
+# If names differ, change them in the code below.
+oasis <- oasis%>%
+  mutate(
+    # Time in years since baseline MRI
+    time_years = mr_delay / 365,
+    # Centered time
+    time_c = time_years - mean(time_years, na.rm = TRUE),
+    
+    # Binary poor cognition indicator (MMSE < 24 is common cutoff)
+    poor_cognition = if_else(mmse < 24, 1L, 0L),
+    
+    # Make factors nicely labeled
+    sex = factor(sex, levels = c("F", "M")),
+    group = factor(group),         # e.g., "Nondemented", "Demented"
+    subject_id = factor(subject_id)
+  )
+
+## Remove NAs
+oasis <- oasis %>% drop_na()
+
+```
+
+### Methods Description
+
+#### Generalized Linear Model (GLM)
+
+A cross-sectional logistic generalized linear model (GLM) was used to estimate the association between baseline predictors and the probability of poor cognition at the final assessment (MMSE \< 24). The logistic GLM is **well-suited** for this **binary outcome** because it models the log-odds of impairment as a linear function of predictors, provides interpretable effect estimates in the form of odds ratios, and ensures that predicted probabilities remain between 0 and 1. This model summarizes how demographic and clinical characteristics at baseline, specifically age, education, sex, CDR score, and diagnostic group, contribute to the probability of cognitive impairment in a single time point analysis. The GLM also serves as a foundational model that establishes baseline association patterns before incorporating longitudinal dependence in repeated-measures frameworks such as GEE and GLMM, offering a computationally efficient and statistically robust first step for identifying key predictors of poor cognition.
+
+The model takes the following form:
+
+$$
+\text{logit}\left[ P(Y_i = 1) \right]
+    = \beta_0 
+    + \beta_1 \text{Age}_i
+    + \beta_2 \text{Educ}_i
+    + \beta_3 \text{Sex}_i
+    + \beta_4 \text{CDR}_i
+    + \beta_5 \text{Group}_i .
+$$
+
+The following assumptions and diagnostic checks were performed to evaluate the adequacy of the logistic GLM:
+
+-   **Correct link function**\
+    Verified by assessing whether the logit link appropriately captured the relationship between predictors and the outcome.
+
+-   **Independence of observations**\
+    Reasonable in this cross-sectional setting, with one observation per participant.
+
+-   **Absence of influential outliers**\
+    Examined through standardized residuals, leverage values, and Cook’s distance.
+
+-   **Multicollinearity**\
+    Assessed using variance inflation factors (VIF) for all covariates.
+
+-   **Goodness of fit**\
+    Evaluated using the Hosmer–Lemeshow test and associated calibration diagnostics.
+
+-   **Model discrimination**\
+    Quantified using receiver operating characteristic (ROC) curves and the area under the curve (AUC).
+
+-   **Calibration**\
+    Evaluated by comparing predicted probabilities with observed event rates across decile-based prediction bins.
+
+```{r}
+########################################
+## 3. Build Dataset for GLM (Baseline + Final Only)
+########################################
+
+# 3.1 Baseline (Visit == 1)
+baseline <- oasis %>%
+  filter(visit == 1) %>%
+  dplyr::select(
+    subject_id,
+    age_baseline = age,
+    educ_baseline = educ,
+    sex_baseline  = sex,
+    cdr_baseline  = cdr,
+    group_baseline = group,
+    mmse_baseline = mmse
+  )
+
+# 3.2 Final visit per subject (max visit)
+final <- oasis %>%
+  group_by(subject_id) %>%
+  filter(visit == max(visit)) %>%
+  ungroup() %>%
+  dplyr::select(
+    subject_id,
+    visit_final = visit,
+    time_years_final = time_years,
+    mmse_final = mmse,
+    poor_cognition_final = poor_cognition
+  )
+
+# 3.3 Merge baseline + final
+glm_dat <- baseline %>%
+  inner_join(final, by = "subject_id") %>%
+  mutate(
+    delta_mmse = mmse_final - mmse_baseline
+  )
+
+# Keep only subjects with at least 2 visits (otherwise baseline == final)
+glm_dat <- glm_dat %>%
+  filter(visit_final > 1)
+
+```
+
+#### GEE
+
+#### GLMM
+
+## Results
+
+### Generalized Linear Model (GLM)
+
+#### Model Summary
+
+```{r}
+#| label: glm-baseline
+library(broom)
+library(dplyr)
+
+glm_rq1 <- glm(
+  poor_cognition_final ~ age_baseline + educ_baseline + sex_baseline +
+    cdr_baseline + group_baseline,
+  data = glm_dat,
+  family = binomial()
+)
+
+```
+
+```{r}
+#| label: tbl-glm-baseline
+#| tbl-cap-location: top
+#| tbl-cap: "GLM Model Summary"
+glm_rq1_tidy <- tidy(glm_rq1)
+kable(glm_rq1_tidy,digits = 3)
+```
+
+```{r}
+#| label: tbl-glm-baseline_or
+#| tbl-cap-location: top
+#| tbl-cap: "Odds Ratio table of GLM model"
+
+glm_rq1_tidy_or <- tidy(glm_rq1, exponentiate = TRUE, conf.int = TRUE)
+
+glm_rq1_or_table <- glm_rq1_tidy_or %>%
+  mutate(
+    estimate2 = ifelse(estimate > 9999, Inf, estimate),
+    conf.low2 = ifelse(conf.low > 9999, Inf, conf.low),
+    conf.high2 = ifelse(conf.high > 9999 | is.na(conf.high), Inf, conf.high),
+
+    OR_CI = sprintf(
+      "%.3f (%.3f, %.3f)",
+      estimate2, conf.low2, conf.high2
+    ),
+    OR_CI = ifelse(
+      is.infinite(estimate2),
+      "Inf (0.000, Inf)",
+      OR_CI
+    )
+  ) %>%
+  dplyr::select(
+    Predictor = term,
+    `Odds Ratio (95% CI)` = OR_CI
+  )
+
+kable(
+  glm_rq1_or_table,
+  align = "l",
+  digits = 3
+)
+
+
+```
+
+As shown in @tbl-glm-baseline, we fit a logistic GLM to evaluate whether baseline demographic and clinical characteristics were associated with poor cognition (MMSE \< 24) at the subject’s final recorded visit. Predictors included `baseline age`, `education`, `sex`, `CDR score`, and `dementia group`. By checking p-value, only Education and Baseline CDR are significant since they have a smaller p value. Overall, the logistic GLM identified **baseline education** and **CDR** as significant predictors of poor cognition at follow-up. Higher education was protective, while greater baseline cognitive impairment strongly increased the likelihood of future poor cognition. `Age` and `sex` were not significant predictors. The dementia group indicator exhibited quasi-complete separation, reflecting that dementia diagnosis nearly perfectly predicted poor cognition at follow-up, resulting in unstable logistic GLM estimates.
+
+Moreover, we also summarized the odds ratios (ORs) and 95% confidence intervals (CIs) from the logistic GLM (See @tbl-glm-baseline_or), which modeled the association between baseline predictors and the likelihood of poor cognition at the subject’s final visit. In the logistic GLM, `baseline age` was not associated with poor cognition at follow-up; the odds ratio was near 1 and the confidence interval included 1, indicating no meaningful or statistically significant effect. `Higher education` significantly reduced the odds of poor cognition, with an **OR below 1 and a confidence interval that did not cross 1, consistent with a protective effect**. `Sex` showed no association with cognitive outcomes; the OR was close to 1 and the wide CI included 1. `Baseline CDR`was a very strong predictor of later poor cognition, with an **extremely large OR and CI well above 1**, indicating a robust and clinically expected relationship. `Dementia group` produced extremely large and unstable OR estimates with undefined or infinite confidence intervals, reflecting quasi-complete separation; although clinically predictive, this variable could not be reliably estimated by standard logistic regression.
+
+#### Model Performance
+
+To evaluate overall model performance, we assessed the classification accuracy by comparing predicted probabilities against the observed outcomes, providing a summary measure of how well the model distinguished individuals with and without poor cognition.
+
+```{r}
+#| label: tbl-glm-confusion-matrix
+#| tbl-cap-location: top
+#| tbl-cap: "Confusion Matrix for Logistic GLM (Predicted vs. Observed)"
+### Predicted probabilities
+# Extract the dataset actually used in fitting the model
+#glm_dat_used <- model.frame(glm_rq1)
+
+glm_dat_used <- model.frame(glm_rq1) %>%
+  mutate(
+    pred_prob  = predict(glm_rq1, type = "response"),
+    pred_class = if_else(pred_prob > 0.5, 1, 0)
+  )
+
+
+conf_mat <- table(
+  Predicted = glm_dat_used$pred_class,
+  Observed  = glm_dat_used$poor_cognition_final
+)
+
+conf_mat_tidy <- as.data.frame(conf_mat) %>%
+  pivot_wider(
+    names_from = Observed,
+    values_from = Freq,
+    names_prefix = "Observed_"
+  ) %>%
+  rename(
+    Predicted_Class = Predicted,
+    `Observed 0` = Observed_0,
+    `Observed 1` = Observed_1
+  )
+
+kable(
+  conf_mat_tidy,
+  align = "c"
+)
+```
+
+```{r}
+#| label: tbl-glm-performance
+#| tbl-cap-location: bottom
+#| tbl-cap: "GLM Model Metrics Summary"
+tn <- conf_mat_tidy %>%
+  filter(Predicted_Class == 0) %>%
+  pull(`Observed 0`)
+
+fn <- conf_mat_tidy %>%
+  filter(Predicted_Class == 0) %>%
+  pull(`Observed 1`)
+
+fp <- conf_mat_tidy %>%
+  filter(Predicted_Class == 1) %>%
+  pull(`Observed 0`)
+
+tp <- conf_mat_tidy %>%
+  filter(Predicted_Class == 1) %>%
+  pull(`Observed 1`)
+
+
+acc        <- (tp + tn) / (tp + tn + fp + fn)
+recall     <- tp / (tp + fn)                 # sensitivity
+specificity<- tn / (tn + fp)
+ppv        <- tp / (tp + fp)                 # precision
+f1         <- 2 * ppv * recall / (ppv + recall)
+
+
+metrics_tbl <- tibble(
+  Metric = c(
+    "Accuracy",
+    "Recall (Sensitivity)",
+    "Specificity",
+    "PPV (Precision)",
+    "F1 score"
+  ),
+  Value = round(c(acc, recall, specificity, ppv, f1), 3)
+)
+
+kable(
+  metrics_tbl
+)
+```
+
+From @tbl-glm-confusion-matrix and @tbl-glm-performance, the model correctly classified most cases, with high specificity and moderate sensitivity: it correctly predicted 116 of 118 non-impaired individuals (specificity $\approx 98\%$ ) and 13 of 24 impaired individuals (sensitivity $\approx 54\%$ ), yielding strong performance for identifying non-impaired cases but more limited ability to detect poor cognition.
+
+```{r}
+#| label: fig-glm-roc
+#| fig-cap-location: bottom
+#| fig-cap: "ROC Curve for GLM Model"
+########################################
+## Discrimination: ROC & AUC
+########################################
+
+roc_obj <- roc(glm_dat_used$poor_cognition_final, glm_dat_used$pred_prob)
+auc(roc_obj)
+
+plot(roc_obj, col = "blue")
+
+```
+
+The ROC curve (See @fig-glm-roc) for the logistic GLM demonstrates strong discriminative ability, with the model performing substantially better than chance. The curve rises steeply and remains well above the 45° reference line, suggesting an area under the curve (AUC) close to 0.85–0.90. This indicates that the model effectively separates subjects with poor cognition from those without impairment. Although the default classification threshold of 0.5 yields moderate sensitivity due to class imbalance, the ROC curve shows that alternative thresholds would substantially improve the detection of cognitively impaired individuals without sacrificing excessive specificity.
+
+```{r}
+#| label: fig-glm-cal
+#| fig-cap: "Calibration Plot for GLM "
+#| fig-cap-location: bottom
+
+# Rebuild the analysis dataset used in the model (in case it's not in memory)
+glm_dat_used <- model.frame(glm_rq1) %>%
+  mutate(
+    pred_prob  = predict(glm_rq1, type = "response"),
+    pred_class = if_else(pred_prob > 0.5, 1, 0)
+  )
+
+# Create deciles of predicted risk
+calib_dat <- glm_dat_used %>%
+  mutate(
+    pred_decile = ntile(pred_prob, 10)  # 10 bins; change if you want
+  ) %>%
+  group_by(pred_decile) %>%
+  summarise(
+    mean_pred = mean(pred_prob),
+    obs_rate  = mean(poor_cognition_final),
+    n         = n(),
+    .groups   = "drop"
+  )
+
+ggplot(glm_dat_used, aes(x = pred_prob, y = poor_cognition_final)) +
+  geom_smooth(method = "loess", se = TRUE) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed") +
+  labs(
+    x = "Predicted probability of poor cognition",
+    y = "Observed probability",
+    title = "Smoothed Calibration Curve for Logistic GLM"
+  ) +
+  coord_equal() +
+  theme_minimal()
+
+```
+
+```{r}
+#| label: tbl-glm-cal
+#| tbl-cap: Calibration Table (Decile-Based)
+kable(
+  calib_dat,
+  digits = 3
+)
+```
+
+As shown in @tbl-glm-cal and @fig-glm-cal, the smoothed calibration curve largely tracks the 45° identity line, indicating **overall acceptable agreement** between predicted and observed probabilities. At very low predicted risks, the curve lies close to the line (consistent with the table’s perfect calibration in deciles 1–6). Around the mid-range of predicted probabilities, the curve oscillates slightly above and below the line, reflecting minor over- and underestimation. At higher predicted probabilities, the curve rises above the line, suggesting that the model **tends to underestimate the probability of poor cognition among the highest-risk individuals**, although the wide confidence band in this region indicates greater uncertainty due to fewer observations.
+
+Overall, The model is well calibrated for low to moderate risk levels and shows modest underestimation at the highest predicted risks.
+
+#### Model dignostic
+
+##### Deviance Residuals
+
+```{r}
+#| label: fig-glm-dres
+#| fig-cap: "Deivance Residuals Plot for Logistic GLM"
+# Deviance residuals
+dev_res <- residuals(glm_rq1, type = "deviance")
+
+dev_res_df <- data.frame(
+  index    = seq_along(residuals(glm_rq1, type = "deviance")),
+  dev_res  = residuals(glm_rq1, type = "deviance")
+)
+
+ggplot(dev_res_df, aes(x = index, y = dev_res)) +
+  geom_point(alpha = 0.7) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  labs(
+    x = "Observation index",
+    y = "Deviance residual",
+    title = "Deviance Residuals for Logistic GLM"
+  ) +
+  theme_minimal()
+
+```
+
+From @fig-glm-dres, the deviance residuals are scattered around zero without a strong pattern, suggesting no major violations of model fit. The points show roughly symmetric dispersion above and below the horizontal line, which is consistent with what we expect from a reasonably specified logistic regression model.
+
+##### Cook's Distance Plot
+
+```{r}
+#| label: fig-glm-cook
+#| fig-cap: "Cook's Distance Plot for Logistic GLM"
+
+cook_df <- data.frame(
+  index = seq_along(cooks.distance(glm_rq1)),
+  cook  = cooks.distance(glm_rq1)
+)
+
+cutoff <- 4 / nrow(cook_df)
+#hat_cutoff  <- 2 * mean(cook_df$hat)
+cook_vals <- cooks.distance(glm_rq1)
+hold <- 4 / length(cook_vals)
+
+#identify outliers
+cook_outliers <- cook_df %>% 
+  filter(cook > hold)
+
+ggplot(cook_df, aes(x = index, y = cook)) +
+  geom_col(fill = "orange") +
+  geom_hline(yintercept = hold, linetype = "dashed", color = "red", size = 1) +
+  
+  # label the hold line
+  annotate(
+    "text",
+   x = 5,               
+    y = hold + 0.01,
+    label = paste0("hold = ", round(hold, 3)),
+    vjust = -0.5,
+    hjust = 0.5,
+    color = "red"
+  ) +
+  
+  geom_text_repel(
+    data = cook_outliers,
+    aes(label = index),
+    nudge_y = 0.005,
+    size = 4,
+    color = "black",
+    segment.color = "gray50",
+    min.segment.length = 0
+  ) +
+  
+  labs(
+    x = "Observation index",
+    y = "Cook's distance",
+    title = "Cook's Distance for Logistic GLM"
+  ) +
+  theme_minimal()
+
+
+```
+
+The Cook’s distance plot identified a small number of moderately influential observations, but none exceeded levels typically associated with undue influence. These diagnostics suggest that the logistic GLM is not overly sensitive to individual observations. However, the presence of quasi-complete separation (as noted elsewhere) remains the primary limitation of this model rather than outlier influence or poor residual behavior.
+
+##### Goodness
+
+```{r}
+#| label: tbl-glm-goodness
+#| tbl-cap-location: bottom
+#| tbl-cap: "Hosmer-Lemeshow Goodness-of-Fit Test for Logistics GLM"
+########################################
+## Hosmer-Lemeshow Goodness-of-Fit
+########################################
+hoslem.test(glm_dat$poor_cognition_final, fitted(glm_rq1))
+hl_table <- data.frame(
+  Statistic = c("Hosmer–Lemeshow X²", "df", "p-value"),
+  Value = c(4.678, 8, 0.791)
+)
+
+kable(
+  hl_table,
+  align = "c"
+)
+
+```
+
+A Hosmer–Lemeshow goodness-of-fit test was conducted to assess how well the logistic GLM matched the observed data ( @tbl-glm-goodness). The test yielded $\chi^2$ = 4.7 with 8 degrees of freedom (p = 0.79\>0.05), indicating no evidence of lack of fit. Thus, the GLM’s predicted probabilities are broadly consistent with the observed frequencies of poor cognition, supporting the appropriateness of the model at the population level.
+
+### GEE
+
+### GLMM
+
+## Discussion
+
+1.  Model Comparision
+2.  Future potential directions
+
+(potential dicussion: the choose of cutoff value of MMSE, some literatures shows that for different age and education levels, the optimized cuttoff value of MMSE score is also different. see https://pubmed.ncbi.nlm.nih.gov/18625866/ )
+
+Cite:
+
+-   Summarization of main points, conclusions based in results
+-   Summarization of the various models applied, which ones you prefer and base your interpretations off of and why
+
+## Conclusion
+
+## Data Availability
+
+OASIS-2 data could be downloaded through kaggle (see '/Link.txt' for more information). For convenience, we also upload the data we used in github repo (see '/data/oasis_longitudinal.csv')
+
+## Code Avaiability
+
+All codes are available at '/code'. The code for `.Qmd` reproduction is also provided. Hope you all would enjoy our project!
+
+## Reference
