@@ -21,3 +21,12 @@ Result Comparisons
 
 ## Conclusion
 Future potential directions
+
+## Supplement materials
+
+For peer reviewers and graders, we recommend you all to get access the data through this github repo using the following code:
+```{r}
+## Data access
+library(readr)
+oasis <- read_csv("https://raw.githubusercontent.com/lucillelu530/BIOS667_Grp6/main/data/oasis_longitudinal.csv")
+```
