@@ -1,6 +1,6 @@
 # BIOS667 Final Project
 
-Longitudinal Modeling of Cognitive Decline in Older Adults Using GLM, GEE, and GLMM: An Analysis of the OASIS-2 Cohort.\
+Longitudinal Modeling of Cognitive Decline in Older Adults Using GLM, GEE, and GLMM: An Analysis of the OASIS-2 Cohort.
 
 ## Introduction
 
