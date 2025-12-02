@@ -27,48 +27,42 @@ library(broom)     # for tidy() tables
 oasis_raw <- read.csv("oasis_longitudinal.csv")
 oasis <- oasis_raw %>%
   rename(
-    subject_id   = Subject.ID,
-    mri_id       = MRI.ID,
-    group        = Group,
-    visit        = Visit,
-    mr_delay     = MR.Delay,
-    sex          = M.F,
-    hand         = Hand,
-    age          = Age,
-    educ         = EDUC,
-    ses          = SES,
-    mmse         = MMSE,
-    cdr          = CDR,
-    etiv         = eTIV,
-    nwbv         = nWBV,
-    asf          = ASF
-  )
-
-########################################
-## 2. Create Time & Derived Variables
-########################################
-
-oasis <- oasis %>%
+    subject_id = Subject.ID,
+    visit      = Visit,
+    mr_delay   = MR.Delay,
+    sex        = M.F,
+    age        = Age,
+    educ       = EDUC,
+    mmse       = MMSE,
+    cdr        = CDR,
+    group      = Group
+  ) %>%
   mutate(
-    # Time in years since MRI (or baseline if mr_delay is from first scan)
-    time_years = mr_delay / 365,
-    # Centered time (global centering)
-    time_c = time_years - mean(time_years, na.rm = TRUE),
-    age_c = age - 77,
-    # Binary poor cognition indicator
+
+    # Outcome: Poor Cognition
     poor_cognition = if_else(mmse < 24, 1L, 0L),
 
-    # Factors
-    sex   = factor(sex, levels = c("F", "M")),
-    group = factor(group),
-    subject_id = factor(subject_id)
+    # Factor conversions
+    sex = factor(sex, levels = c("F", "M")),
+    group = factor(group, levels = c("Nondemented", "Demented")),
+    subject_id = factor(subject_id),
+
+    # -----------------------------
+    # OPTION A: Education Categories
+    # -----------------------------
+    educ_cat = case_when(
+      educ <= 12 ~ "Low",
+      educ >= 13 & educ <= 15 ~ "Medium",
+      educ >= 16 ~ "High",
+      TRUE ~ NA_character_
+    ),
+    
+    # Convert to ordered factor so "Low" is reference
+    educ_cat = factor(educ_cat, 
+                      levels = c("Low", "Medium", "High"))
   )
 
-# Optional: set desired reference level for group (if applicable)
-# e.g., make "Nondemented" the reference
-if ("Nondemented" %in% levels(oasis$group)) {
-  oasis$group <- relevel(oasis$group, ref = "Nondemented")
-}
+
 
 ########################################
 ## 4. Build Dataset for GEE (all visits)
@@ -78,14 +72,13 @@ if ("Nondemented" %in% levels(oasis$group)) {
 oasis_gee <- oasis %>%
   filter(
     !is.na(mmse),
-    !is.na(time_years),
     !is.na(age),
     !is.na(educ),
     !is.na(sex),
     !is.na(cdr),
     !is.na(group)
   ) %>%
-  arrange(subject_id, time_years) %>%
+  arrange(subject_id) %>%
   group_by(subject_id) %>%
   mutate(
     n_visits = n()   # just for info / optional sensitivity check
@@ -98,19 +91,16 @@ oasis_gee <- oasis %>%
 ```{r}
 
 library(ggplot2)
-oasis_gee_filtered <- oasis_gee %>%
-  filter(time_years < 4)
-# Spaghetti Plot
-# 目的: 初步观察不同组别的基线差异以及随时间的变化趋势
-ggplot(oasis_gee_filtered, aes(x = time_years, y = mmse, group = subject_id, color = group)) +
-  # 1. 绘制每个受试者的细线 (透明度设低一点以免重叠严重)
+
+ggplot(oasis_gee, aes(x = visit, y = mmse, group = subject_id, color = educ_cat)) +
+
   geom_line(alpha = 0.3, size = 0.5) +
-  # 2. 添加每个组的平滑均值曲线 (Loess 或 线性拟合)
-  geom_smooth(aes(group = group), method = "loess", se = FALSE, size = 1) +
+  
+  geom_smooth(aes(group = educ_cat), method = "loess", se = FALSE, size = 1) +
   labs(
     title = "Visualization of Raw MMSE Trajectories",
     subtitle = "Spaghetti plot with group mean trends",
-    x = "Time (Years)",
+    x = "Visit",
     y = "MMSE Score"
   ) +
   theme_minimal()
@@ -123,19 +113,17 @@ ggplot(oasis_gee_filtered, aes(x = time_years, y = mmse, group = subject_id, col
 # 2. GEE Analysis for RQ1 (Binary Outcome: Poor Cognition)
 
 
-Nondemented (72), Demented (64), Converted (14)
-
 ## 2.1 Model Specification and Fitting
 
-We modelled the binary indicator of poor cognition (MMSE \< 24) using generalized estimating equations (GEE) with a binomial variance and logit link function, specifying subject as the clustering unit. This models the log-odds of poor cognition as a linear function of time, age, education, and sex.
+We modelled the binary indicator of poor cognition (MMSE \< 24) using generalized estimating equations (GEE) with a binomial variance and logit link function, specifying subject as the clustering unit. This models the log-odds of poor cognition as a linear function of visit, age, education, and sex.
 
-$$\text{logit}(P(Y_{it}=1)) = \beta_0 + \beta_1 \text{Time}_{it} + \beta_2 \text{Group}_i + \beta_3 (\text{Time}_{it} \times \text{Group}_i) + \beta_4 \text{AgeBase}_i + \beta_5 \text{Educ}_i + \beta_6 \text{Sex}_i$$
+$$\text{logit}(P(Y_{it}=1)) = \beta_0 + \beta_1 \text{Visit}_{it} + \beta_2 \text{Education_Level}_i + \beta_3 (\text{Visit}_{it} \times \text{Education_Level}_i) + \beta_4 \text{AgeBaseline}_i  + \beta_5 \text{Sex}_i$$
 
 ```{r}
 library(geepack)
 library(broom)
 
-form_rq1 <- poor_cognition ~ time_c * group + age + educ + sex
+form_rq1 <- poor_cognition ~ visit * educ_cat + age + sex
 
 gee_rq1_ind <- geeglm(
   formula = form_rq1,
@@ -163,6 +151,7 @@ gee_rq1_ar1 <- geeglm(
 
 summary(gee_rq1_ind)
 summary(gee_rq1_exch)
+
 summary(gee_rq1_ar1)
 
 ```
@@ -174,7 +163,7 @@ summary(gee_rq1_ar1)
 
 # Use the Exchangeable model for diagnostics
 gee_exch <- gee_rq1_exch
-
+tidy(gee_rq1_exch, conf.int = TRUE)
 # 1. Extract Naive and Robust Standard Errors
 se_naive <- sqrt(diag(gee_exch$geese$vbeta.naiv)) # Naive SE (based on model structure assumption)
 se_robust <- sqrt(diag(gee_exch$geese$vbeta))    # Robust SE (based on empirical data variability)
@@ -191,7 +180,6 @@ se_robust_bc <- se_robust * bc_factor
 # 4. Compile coefficient and SE comparison table
 coef_est <- coef(gee_exch)
 se_table <- data.frame(
-  term = names(coef_est),
   estimate = coef_est,
   SE_naive = se_naive,
   SE_robust = se_robust,
@@ -211,7 +199,8 @@ knitr::kable(
   se_table,
   digits = 3,
   caption = "GEE Coefficient and Standard Error Comparison (RQ1: poor_cognition)"
-)
+) %>%
+  kable_styling()
 
 ```
 
@@ -220,7 +209,7 @@ knitr::kable(
 
 # 1. Extract Pearson residuals from the Exchangeable model
 oasis_gee <- oasis_gee %>%
-  arrange(subject_id, time_c) %>%
+  arrange(subject_id, visit) %>%
   mutate(resid_exch = residuals(gee_rq1_exch, type = "pearson"))
 
 # 2. Define Lag range (up to 5 visits apart)
@@ -258,7 +247,8 @@ GLMM is better
 ```{r}
 
 library(tibble)
-
+library(kableExtra)
+library(gt)
 qic_tab <- tibble(
   corstr = c("independence", "exchangeable", "ar1"),
   QIC    = c(
@@ -267,9 +257,13 @@ qic_tab <- tibble(
     geepack::QIC(gee_rq1_ar1)[["QIC"]]
   )
 )
-
-qic_tab
-
+qic_tab %>%
+  gt() %>%
+  tab_header(
+    title = "Model Fit Comparison",
+    subtitle = "QIC Values by Correlation Structure For RQ1"
+  )
+# kable(qic_tab, caption = "Table 1: QIC Comparison of Correlation Structures For RQ1")
 tidy_gee_rq1_exch <- broom::tidy(gee_rq1_exch) %>% 
   mutate(
     OR   = exp(estimate),
@@ -298,8 +292,8 @@ models <- list(
 )
 
 coef_comp <- map_dfr(models, tidy, .id = "model_name") %>%
-  filter(term %in% c("(Intercept)", "time_c", "groupConverted", "groupDemented", 
-                     "time_c:groupConverted", "time_c:groupDemented")) %>%
+  filter(term %in% c("(Intercept)", "visit", "educ_catHigh", "educ_catMedium", 
+                     "visit:educ_catHigh", "visit:educ_catMedium")) %>%
   dplyr::select(model_name, term, estimate) %>%
   pivot_wider(names_from = model_name, values_from = estimate)
 
@@ -319,10 +313,9 @@ final_model <- gee_rq1_exch
 
 # 2. Prediction Grid
 new_data <- expand.grid(
-  time_c = seq(min(oasis_gee$time_c), max(oasis_gee$time_c), length.out = 100),
-  group  = factor(c("Nondemented", "Converted", "Demented"), levels = levels(oasis_gee$group)),
+  visit = oasis_gee$visit,
   age    = mean(oasis_gee$age, na.rm = TRUE),
-  educ   = mean(oasis_gee$educ, na.rm = TRUE),
+  educ_cat = oasis_gee$educ_cat,
   sex    = factor("F", levels = levels(oasis_gee$sex)) 
 )
 
@@ -333,15 +326,15 @@ plot_data <- new_data %>%
   mutate(pred_prob = as.numeric(preds))
 
 # 4. plot
-ggplot(plot_data, aes(x = time_c, y = pred_prob, color = group, linetype = group)) +
+ggplot(plot_data, aes(x = visit, y = pred_prob, color = educ_cat, linetype = educ_cat)) +
   geom_line(size = 1.2) +
   labs(
-    title = "Population-Average Probability of Poor Cognition Over Time",
+    title = "Population-Average Probability of Poor Cognition Over Visit",
     subtitle = "Based on GEE (Exchangeable Correlation)",
     y = "Probability of Poor Cognition (MMSE < 24)",
-    x = "Centered Time (Years from Baseline Average)",
-    color = "Group",
-    linetype = "Group"
+    x = "Visit Number",
+    color = "Educ_level",
+    linetype = "Educ_level"
   ) +
   theme_minimal() +
   scale_y_continuous(limits = c(0, 1), labels = scales::percent) # Y轴设为 0-100%
@@ -351,6 +344,9 @@ ggplot(plot_data, aes(x = time_c, y = pred_prob, color = group, linetype = group
 
 ## 3.1 Model Specification and Fitting
 
+$$E(MMSE) = \beta_0 + \beta_1 \text{Visit}_{it} + \beta_2 \text{Education_Level}_i + \beta_3 (\text{Visit}_{it} \times \text{Education_Level}_i) + \beta_4 \text{AgeBaseline}_i  + \beta_5 \text{Sex}_i$$
+
+
 ```{r}
 library(geepack)
 library(broom)
@@ -358,7 +354,7 @@ library(tibble)
 library(dplyr)
 
 # Mean model for RQ2
-form_rq2 <- mmse ~ time_c * group + age_c + educ + sex
+form_rq2 <- mmse ~ visit * educ_cat + age  + sex
 
 gee_rq2_ind <- geeglm(
   formula = form_rq2,
@@ -400,29 +396,20 @@ qic_rq2 <- tibble(
   )
 )
 
-qic_rq2
-# 确保 knitr 包已加载
+tidy(gee_rq2_exch,conf.int = TRUE)
 library(knitr)
 
-# 使用 kable 格式化 tibble
 qic_rq2 %>%
-  kable(
-    # 设置列名
-    col.names = c("Corstr", "QIC"),
-    # 设置数字的显示位数
-    digits = 3,
-    # 设置表格格式 (如 "markdown", "html", "latex", "pipe")
-    format = "pipe",
-    caption = "QIC Comparison Under Different Correlation Structure"
-  ) %>%
-kable_styling(
-    bootstrap_options = c("basic")
-  ) 
+  gt() %>%
+  tab_header(
+    title = "Model Fit Comparison",
+    subtitle = "QIC Values by Correlation Structure For RQ2"
+  )
 ```
 
 ```{r}
 gee_rq2_best <- gee_rq2_exch  # or _exch / _ind depending on QIC
-
+summary(gee_rq2_best)
 tidy_gee_rq2 <- broom::tidy(gee_rq2_best) %>%
   mutate(
     LCL = estimate - 1.96 * std.error,
@@ -448,7 +435,6 @@ se_robust_bc <- se_robust * bc_factor
 
 coef_est <- coef(gee_exch_mmse)
 se_table_rq2 <- data.frame(
-  term = names(coef_est),
   estimate = coef_est,
   SE_naive = se_naive,
   SE_robust = se_robust,
@@ -467,7 +453,8 @@ knitr::kable(
   se_table_rq2,
   digits = 3,
   caption = "RQ2: GEE Coefficient and Standard Error Comparison (Outcome: MMSE)"
-)
+) %>%
+  kable_styling()
 ```
 
 ```{r}
@@ -476,7 +463,7 @@ library(dplyr)
 library(purrr)
 
 oasis_gee <- oasis_gee %>%
-  arrange(subject_id, time_c) %>%
+  arrange(subject_id, visit) %>%
   mutate(resid_mmse = residuals(gee_rq2_exch, type = "pearson"))
 
 
@@ -511,7 +498,6 @@ estimated_alpha <- summary(gee_rq2_exch)$geese$alpha
 ggplot(empirical_corr_rq2, aes(x = lag, y = corr)) +
   geom_point(size = 3) + 
   geom_line() +
-  # 添加代表 Exchangeable 假设的水平虚线
   geom_hline(yintercept = estimated_alpha, color = "red", linetype = "dashed") +
   scale_y_continuous(limits = c(-0.2, 1)) +
   labs(
@@ -537,7 +523,7 @@ diag_data <- oasis_gee %>%
     resid  = residuals(gee_rq2_exch, type = "pearson")
   )
 
-ggplot(diag_data, aes(x = fitted, y = resid, color = group)) +
+ggplot(diag_data, aes(x = fitted, y = resid, color = educ_cat)) +
   geom_point(alpha = 0.6) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_smooth(se = FALSE, color = "black", size = 0.5) + # 添加平滑线辅助判断
@@ -558,11 +544,11 @@ check_influence <- function(drop_id, full_data) {
   
   # 重新拟合 (使用 tryCatch 避免报错中断)
   tryCatch({
-    mod <- geeglm(mmse ~ time_c * group + age + educ + sex, 
+    mod <- geeglm(mmse ~ visit * educ_cat + age  + sex, 
                   family = gaussian, data = sub_dat, id = subject_id, 
                   corstr = "exchangeable")
-    # 提取我们最关心的交互项系数: time_c:groupDemented
-    coef(mod)["time_c:groupDemented"]
+    # 提取我们最关心的交互项系数: visit:groupDemented
+    coef(mod)["visit:educ_catHigh"]
   }, error = function(e) NA)
 }
 
@@ -574,7 +560,7 @@ all_ids <- unique(oasis_gee$subject_id)
 influence_res <- map_dbl(all_ids, check_influence, full_data = oasis_gee)
 
 # 创建数据框并计算 Delta Beta (变化量)
-full_coef <- coef(gee_rq2_exch)["time_c:groupDemented"]
+full_coef <- coef(gee_rq2_exch)["visit:educ_catHigh"]
 inf_df <- data.frame(
   subject_id = all_ids,
   coef_jack  = influence_res
@@ -586,8 +572,8 @@ ggplot(inf_df, aes(x = subject_id, y = delta_beta)) +
   geom_point() +
   geom_segment(aes(xend = subject_id, yend = 0)) +
   labs(
-    title = "Step 5: Influence Diagnostics (Delta-Beta)",
-    subtitle = "Change in 'Time x Demented' coefficient when excluding each subject",
+    title = "Influence Diagnostics (Delta-Beta)",
+    subtitle = "Change in 'Visit x High Graduation' coefficient when excluding each subject",
     y = "Change in Coefficient",
     x = "Subject ID"
   ) +
@@ -611,8 +597,8 @@ models_rq2 <- list(
 
 # 2. 提取系数并合并
 coef_comp_rq2 <- map_dfr(models_rq2, tidy, .id = "model_name") %>%
-  filter(term %in% c("(Intercept)", "time_c", "age_c", "educ","sex","groupConverted", "groupDemented", 
-                     "time_c:groupConverted", "time_c:groupDemented")) %>%
+  filter(term %in% c("(Intercept)", "visit", "age","sex","educ_catHigh","educ_catMedium","visit:educ_catHigh", "visit:educ_catMedium" 
+                     )) %>%
   
   dplyr::select(model_name, term, estimate) %>%
   # 转换为宽格式以便对比
@@ -622,8 +608,9 @@ coef_comp_rq2 <- map_dfr(models_rq2, tidy, .id = "model_name") %>%
 knitr::kable(
   coef_comp_rq2, 
   digits = 3, 
-  caption = "RQ2 Step 7: Robustness of MMSE Coefficient Estimates across Working Correlation Structures"
-)
+  caption = "RQ2 : Robustness of MMSE Coefficient Estimates across Working Correlation Structures "
+) %>%
+  kable_styling(position = "center")
 ```
 
 ```{r}
@@ -634,12 +621,12 @@ library(ggplot2)
 final_model_rq2 <- gee_rq2_exch
 
 # 2. 创建预测网格
-# 固定协变量为均值/众数，只让 time_c 和 group 变化
+# 固定协变量为均值/众数，只让 visit 和 group 变化
 new_data_rq2 <- expand.grid(
-  time_c = seq(min(oasis_gee$time_c), max(oasis_gee$time_c), length.out = 100),
+  visit = oasis_gee$visit,
   group  = factor(c("Nondemented", "Converted", "Demented"), levels = levels(oasis_gee$group)),
-  age_c    = mean(oasis_gee$age_c, na.rm = TRUE),
-  educ   = mean(oasis_gee$educ, na.rm = TRUE),
+  age    = mean(oasis_gee$age, na.rm = TRUE),
+  educ_cat   = oasis_gee$educ_cat,
   sex    = factor("F", levels = levels(oasis_gee$sex)) # 以女性为例
 )
 
@@ -649,16 +636,16 @@ preds_rq2 <- predict(final_model_rq2, newdata = new_data_rq2, type = "response")
 new_data_rq2$pred_mmse <- as.numeric(preds_rq2)
 
 # 4. 绘图
-ggplot(new_data_rq2, aes(x = time_c, y = pred_mmse, color = group, linetype = group)) +
+ggplot(new_data_rq2, aes(x = visit, y = pred_mmse, color = educ_cat, linetype = educ_cat)) +
   geom_line(size = 1.2) +
   scale_y_continuous(limits = c(0, 30)) + # MMSE 评分范围通常是 0-30
   labs(
-    title = "Population-Average MMSE Trajectories Over Time",
+    title = "Population-Average MMSE Trajectories Over Visit Time",
     subtitle = "Based on Gaussian GEE (Exchangeable Correlation)",
     y = "Predicted MMSE Score",
-    x = "Centered Time (Years from Baseline Average)",
-    color = "Group",
-    linetype = "Group"
+    x = "Visit",
+    color = "educ_cat",
+    linetype = "educ_cat"
   ) +
   theme_minimal()
 ```
