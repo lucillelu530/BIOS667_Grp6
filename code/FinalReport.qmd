@@ -383,7 +383,7 @@ $$
 We then compared Independence, Exchangeable, and AR-1 structures using the Quasi-likelihood Information Criterion (QIC):
 
 ```{r}
-#| label: tbl-gee-qic
+#| label: tbl-gee-qic-rq1
 
 ## OASIS For GEE analysis
 ## # Keep rows with all key vars present for GEE models
@@ -440,13 +440,8 @@ qic_tab <- tibble(
     geepack::QIC(gee_rq1_ar1)[["QIC"]]
   )
 )
-qic_tab %>%
-  gt() %>%
-  tab_header(
-    title = "Model Fit Comparison",
-    subtitle = "QIC Values by Correlation Structure For RQ1"
-  )
-# kable(qic_tab, caption = "Table 1: QIC Comparison of Correlation Structures For RQ1")
+
+kable(qic_tab, caption = " QIC Comparison of Correlation Structures For RQ1")
 
 ```
 
@@ -490,13 +485,9 @@ qic_rq2 <- tibble(
 )
 
 library(knitr)
+kable(qic_rq2, caption = " QIC Comparison of Correlation Structures For RQ2")
 
-qic_rq2 %>%
-  gt() %>%
-  tab_header(
-    title = "Model Fit Comparison",
-    subtitle = "QIC Values by Correlation Structure For RQ2"
-  )
+
 ```
 
 As shown in @tbl-gee-qic-rq1, for RQ1, the exchangeable structure had the lowest QIC and aligned well with the correlogram. And for RQ2 (see @tbl-gee-qic-rq2),independence had the numerically lowest QIC, but empirical correlations demonstrated strong within-subject dependence. Therefore, we selected the Exchangeable structure for both RQ1 and RQ2 to provide a model consistent with observed correlation patterns.
@@ -875,7 +866,7 @@ The Cook’s distance plot identified a small number of moderately influential o
 ########################################
 ## Hosmer-Lemeshow Goodness-of-Fit
 ########################################
-hoslem.test(glm_dat$poor_cognition_final, fitted(glm_rq1))
+test<-hoslem.test(glm_dat$poor_cognition_final, fitted(glm_rq1))
 hl_table <- data.frame(
   Statistic = c("Hosmer–Lemeshow X²", "df", "p-value"),
   Value = c(5.6932, 8, 0.682)
