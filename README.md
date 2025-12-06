@@ -8,7 +8,7 @@ Alzheimer’s disease (AD) is the most common cause of dementia worldwide and re
 
 In this study we would use `OASIS` Longitudinal Dataset to investigate how baseline demographic and clinical factors, specifically age, sex, education, and dementia group, relate to both the probability and progression of poor cognition as measured by longitudinal changes in MMSE performance.
 
-Our **research problems** are : (a) How are baseline age, education, sex associated with the probability of poor cognition(defined as `MMSE < 24`), and how does this probability change over time? and (b) How do baseline age, education, sex, and dementia group relate to the rate of cognitive decline, as measured by MMSE?
+Our **research problems** are : (a) How are baseline age, education, and sex associated with the probability of poor cognition (defined as `MMSE < 24`), and how does this probability change over time? (b) How do baseline age, education, sex, and dementia group relate to the rate of cognitive decline, as measured by longitudinal MMSE scores?
 
 ## Data Description
 
