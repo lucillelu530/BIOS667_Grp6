@@ -6,7 +6,7 @@ Longitudinal Modeling of Cognitive Decline in Older Adults Using GLM, GEE, and G
 
 Alzheimer’s disease (AD) is the most common cause of dementia worldwide and remains one of the most pressing public health challenges of the 21st century. Accurate and early cognitive assessment plays a central role in diagnosing Alzheimer’s disease, evaluating disease progression, and identifying individuals at elevated risk of decline. The Mini-Mental State Examination (MMSE) is one of the most widely used tools for assessing global cognitive status in clinical practice and research.
 
-In this study we would use `OASIS` Longitudinal Dataset to investigate how baseline demographic and clinical factors, specifically age, sex, education, and dementia group, relate to both the probability and progression of poor cognition as measured by longitudinal changes in MMSE performance.
+In this study we would use `OASIS` Longitudinal Dataset to investigate how baseline demographic and clinical factors, specifically age, sex, education group, relate to both the probability and progression of poor cognition as measured by longitudinal changes in MMSE performance.
 
 Our **research problems** are : (a) How does education level influence poor cognition (MMSE \< 24), adjusting for age and sex? and (b) How does education level influence the continuous MMSE score over time, adjusting for age and sex?
 
