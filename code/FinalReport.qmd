@@ -96,7 +96,6 @@ oasis <- oasis%>%
 
     # Factor conversions
     sex = factor(sex, levels = c("F", "M")),
-    group = factor(group, levels = c("Nondemented", "Demented")),
     subject_id = factor(subject_id),
 
     # -----------------------------
@@ -120,23 +119,6 @@ oasis <- oasis %>% drop_na()
 
 
 
-## OASIS For GEE analysis
-## # Keep rows with all key vars present for GEE models
-oasis_gee <- oasis %>%
-  filter(
-    !is.na(mmse),
-    !is.na(age),
-    !is.na(educ),
-    !is.na(sex),
-    !is.na(cdr),
-    !is.na(group)
-  ) %>%
-  arrange(subject_id) %>%
-  group_by(subject_id) %>%
-  mutate(
-    n_visits = n()   # just for info / optional sensitivity check
-  ) %>%
-  ungroup()
 
 
 ```
@@ -403,6 +385,23 @@ We then compared Independence, Exchangeable, and AR-1 structures using the Quasi
 ```{r}
 #| label: tbl-gee-qic
 
+## OASIS For GEE analysis
+## # Keep rows with all key vars present for GEE models
+oasis_gee <- oasis %>%
+  filter(
+    !is.na(mmse),
+    !is.na(age),
+    !is.na(educ),
+    !is.na(sex),
+    !is.na(cdr),
+    !is.na(group)
+  ) %>%
+  arrange(subject_id) %>%
+  group_by(subject_id) %>%
+  mutate(
+    n_visits = n()   # just for info / optional sensitivity check
+  ) %>%
+  ungroup()
 
 form_rq1 <- poor_cognition ~ visit * educ_cat + age + sex
 
@@ -500,7 +499,7 @@ qic_rq2 %>%
   )
 ```
 
-As shown in @tbl-gee-qic, for RQ1, the exchangeable structure had the lowest QIC and aligned well with the correlogram. And for RQ2 (see @tbl-gee-qic-rq2),independence had the numerically lowest QIC, but empirical correlations demonstrated strong within-subject dependence. Therefore, we selected the Exchangeable structure for both RQ1 and RQ2 to provide a model consistent with observed correlation patterns.
+As shown in @tbl-gee-qic-rq1, for RQ1, the exchangeable structure had the lowest QIC and aligned well with the correlogram. And for RQ2 (see @tbl-gee-qic-rq2),independence had the numerically lowest QIC, but empirical correlations demonstrated strong within-subject dependence. Therefore, we selected the Exchangeable structure for both RQ1 and RQ2 to provide a model consistent with observed correlation patterns.
 
 #### GLMM
 
@@ -704,7 +703,7 @@ kable(
 )
 ```
 
-From @tbl-glm-performance, the model correctly classified most cases ($\approx 83\%$), yielding strong performance for identifying cases.
+From @tbl-glm-performance, the model correctly classified most cases ($\approx 85\%$), yielding strong performance for identifying cases.
 
 ```{r}
 #| label: fig-glm-roc
@@ -728,7 +727,7 @@ plot(
 
 ```
 
-The ROC curve (See @fig-glm-roc) for the logistic GLM demonstrates strong discriminative ability, with the model performing substantially better than chance. The curve rises steeply and remains well above the 45° reference line, suggesting an area under the curve (AUC) 0.684. This indicates that the model effectively separates subjects with poor cognition from those without impairment. Although the default classification threshold of 0.5 yields moderate sensitivity due to class imbalance, the ROC curve shows that alternative thresholds would substantially improve the detection of cognitively impaired individuals without sacrificing excessive specificity.
+The ROC curve (See @fig-glm-roc) for the logistic GLM demonstrates strong discriminative ability, with the model performing substantially better than chance. The curve rises steeply and remains well above the 45° reference line, suggesting an area under the curve (AUC) 0.714. This indicates that the model effectively separates subjects with poor cognition from those without impairment. Although the default classification threshold of 0.5 yields moderate sensitivity due to class imbalance, the ROC curve shows that alternative thresholds would substantially improve the detection of cognitively impaired individuals without sacrificing excessive specificity.
 
 ```{r}
 #| label: fig-glm-cal
